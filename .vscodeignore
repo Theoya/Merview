@@ -1,0 +1,10 @@
+.gitignore
+src/**
+claude-skill/**
+node_modules/**
+esbuild.js
+install.sh
+tsconfig.json
+*.vsix
+.git/**
+progress.md

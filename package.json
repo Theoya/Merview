@@ -1,0 +1,114 @@
+{
+  "name": "mermaid-viewer",
+  "displayName": "Mermaid Viewer",
+  "description": "Preview Mermaid diagrams with pan and zoom — VS Code extension, CLI tool, and Claude Code skill",
+  "version": "0.1.0",
+  "publisher": "mermaid-viewer",
+  "license": "MIT",
+  "engines": {
+    "vscode": "^1.85.0",
+    "node": ">=18.0.0"
+  },
+  "categories": [
+    "Visualization"
+  ],
+  "main": "./dist/extension.js",
+  "bin": {
+    "merview": "./dist/cli.js"
+  },
+  "activationEvents": [],
+  "contributes": {
+    "languages": [
+      {
+        "id": "mermaid",
+        "aliases": [
+          "Mermaid"
+        ],
+        "extensions": [
+          ".mermaid",
+          ".mmd"
+        ]
+      }
+    ],
+    "commands": [
+      {
+        "command": "mermaid-viewer.preview",
+        "title": "Mermaid: Preview Diagram",
+        "icon": "$(open-preview)"
+      }
+    ],
+    "menus": {
+      "editor/title": [
+        {
+          "command": "mermaid-viewer.preview",
+          "when": "resourceLangId == mermaid",
+          "group": "navigation"
+        }
+      ]
+    }
+  },
+  "scripts": {
+    "build": "node esbuild.js",
+    "build:prod": "node esbuild.js --production",
+    "watch": "node esbuild.js --watch",
+    "package": "vsce package",
+    "setup": "bash install.sh",
+    "electron:dev": "node esbuild.js && electron dist/electron/main.js",
+    "electron:pack": "electron-builder --dir",
+    "electron:dist": "electron-builder"
+  },
+  "dependencies": {
+    "commander": "^12.0.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.4.0",
+    "@types/vscode": "^1.85.0",
+    "@types/node": "^20.0.0",
+    "esbuild": "^0.20.0",
+    "@vscode/vsce": "^2.24.0",
+    "electron": "^33.0.0",
+    "electron-builder": "^25.0.0"
+  },
+  "build": {
+    "appId": "com.mermaid-viewer.app",
+    "productName": "Mermaid Viewer",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "mac": {
+      "category": "public.app-category.developer-tools"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "category": "Development"
+    },
+    "win": {
+      "target": ["nsis", "portable"]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false
+    },
+    "fileAssociations": [
+      {
+        "ext": "mermaid",
+        "name": "Mermaid Diagram",
+        "role": "Viewer"
+      },
+      {
+        "ext": "mmd",
+        "name": "Mermaid Diagram",
+        "role": "Viewer"
+      },
+      {
+        "ext": "md",
+        "name": "Markdown (Mermaid)",
+        "role": "Viewer"
+      }
+    ]
+  }
+}
