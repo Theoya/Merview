@@ -14,6 +14,9 @@ irm https://raw.githubusercontent.com/RocketAnabasis/Mermaid-Viewer/main/install
 
 This clones the repo, builds it, and adds `merview` to your PATH. Requires [Node.js](https://nodejs.org) and [Git](https://git-scm.com).
 
+<img width="1018" height="927" alt="image" src="https://github.com/user-attachments/assets/311d614d-045d-4a79-a049-bba22ef06eb7" />
+<img width="1224" height="829" alt="image" src="https://github.com/user-attachments/assets/550c4842-ea40-4ef3-ba97-e8c4516c0bf3" />
+
 ### Download the app (no Node.js needed)
 
 Grab the latest installer or portable exe from **[Releases](https://github.com/RocketAnabasis/Mermaid-Viewer/releases)**:
