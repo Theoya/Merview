@@ -1,14 +1,19 @@
 import { app, BrowserWindow, Menu, dialog, ipcMain, MenuItemConstructorOptions } from 'electron';
-import { readFileSync, writeFileSync, mkdtempSync, watch, FSWatcher } from 'fs';
+import { readFileSync, writeFileSync, mkdtempSync, watch, FSWatcher, existsSync } from 'fs';
 import { join, basename, resolve } from 'path';
 import { tmpdir } from 'os';
 import { generateMermaidHtml, extractMermaidSource } from '../viewer';
+import { loadSmv, saveSmv, getSmvPath } from '../annotations/smv';
+import { Annotation } from '../annotations/types';
 
 let mainWindow: BrowserWindow | null = null;
 let currentFilePath: string | null = null;
 let currentTheme: 'dark' | 'light' | 'auto' = 'dark';
 let fileWatcher: FSWatcher | null = null;
 let tmpHtmlPath: string | null = null;
+let currentAnnotations: Annotation[] = [];
+let smvWatcher: FSWatcher | null = null;
+let saveDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 function parseArgs(): { file: string | null; theme: 'dark' | 'light' | 'auto' } {
   const args = process.argv.slice(process.argv.findIndex(a => a.endsWith('main.js')) + 1);
@@ -58,6 +63,10 @@ function loadFile(filePath: string): void {
   }
 
   startWatching(absPath);
+
+  const smv = loadSmv(absPath);
+  currentAnnotations = smv ? smv.annotations : [];
+  startSmvWatching(absPath);
 }
 
 function startWatching(filePath: string): void {
@@ -92,6 +101,32 @@ function stopWatching(): void {
     fileWatcher.close();
     fileWatcher = null;
   }
+  stopSmvWatching();
+}
+
+function startSmvWatching(filePath: string): void {
+  stopSmvWatching();
+  const smvPath = getSmvPath(filePath);
+  if (!existsSync(smvPath)) return;
+  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  smvWatcher = watch(smvPath, () => {
+    if (debounceTimer) clearTimeout(debounceTimer);
+    debounceTimer = setTimeout(() => {
+      try {
+        const smv = loadSmv(filePath);
+        if (smv) {
+          currentAnnotations = smv.annotations;
+          if (mainWindow) {
+            mainWindow.webContents.send('load-annotations', currentAnnotations);
+          }
+        }
+      } catch { /* ignore mid-write */ }
+    }, 200);
+  });
+}
+
+function stopSmvWatching(): void {
+  if (smvWatcher) { smvWatcher.close(); smvWatcher = null; }
 }
 
 function loadWelcomePage(): void {
@@ -196,6 +231,17 @@ function buildMenu(): void {
         { role: 'toggleDevTools' },
       ],
     },
+    {
+      label: 'Annotate',
+      submenu: [
+        { label: 'Select Mode', accelerator: 'V', click: () => mainWindow?.webContents.send('set-mode', 'select') },
+        { label: 'Draw Mode', accelerator: 'D', click: () => mainWindow?.webContents.send('set-mode', 'draw') },
+        { label: 'Text Mode', accelerator: 'T', click: () => mainWindow?.webContents.send('set-mode', 'text') },
+        { type: 'separator' },
+        { label: 'Delete Selected', accelerator: 'Delete', click: () => mainWindow?.webContents.send('delete-selected') },
+        { label: 'Clear All Annotations', click: () => mainWindow?.webContents.send('clear-annotations') },
+      ],
+    },
   ];
 
   // macOS app menu
@@ -249,6 +295,37 @@ ipcMain.handle('open-file-dialog', async () => {
 
 ipcMain.on('file-dropped', (_event, filePath: string) => {
   loadFile(filePath);
+});
+
+ipcMain.handle('get-annotations', () => currentAnnotations);
+
+ipcMain.handle('save-annotations', (_event, annotations: Annotation[]) => {
+  currentAnnotations = annotations;
+  if (saveDebounceTimer) clearTimeout(saveDebounceTimer);
+  saveDebounceTimer = setTimeout(() => {
+    if (currentFilePath) {
+      stopSmvWatching();
+      saveSmv(currentFilePath, annotations);
+      startSmvWatching(currentFilePath);
+    }
+  }, 500);
+});
+
+ipcMain.on('renderer-ready', () => {
+  if (mainWindow) {
+    mainWindow.webContents.send('load-annotations', currentAnnotations);
+  }
+});
+
+ipcMain.handle('read-image-as-datauri', async (_event, filePath: string) => {
+  const ext = filePath.toLowerCase().replace(/.*\./, '');
+  const mimeMap: Record<string, string> = {
+    png: 'image/png', jpg: 'image/jpeg', jpeg: 'image/jpeg',
+    gif: 'image/gif', svg: 'image/svg+xml', webp: 'image/webp',
+  };
+  const mime = mimeMap[ext] || 'application/octet-stream';
+  const data = readFileSync(filePath);
+  return `data:${mime};base64,${data.toString('base64')}`;
 });
 
 app.whenReady().then(createWindow);
