@@ -271,6 +271,8 @@ export function generateMermaidHtml(source: string | string[], options: ViewerOp
     <button id="btn-draw" class="mode-btn" title="Draw mode (D)">&#x270E;</button>
     <button id="btn-text" class="mode-btn" title="Text mode (T)">T</button>
     <div class="separator"></div>
+    <button id="btn-export" title="Export SVG (E)">&#x2B07;</button>
+    <div class="separator"></div>
     <input type="color" id="stroke-color" value="#ff4444" title="Stroke color">
     <select id="stroke-width" title="Stroke width">
       <option value="2">2px</option>
@@ -724,6 +726,54 @@ ${mermaidDivs}
     imageLayer.appendChild(div);
   }
 
+  // === Export Full SVG ===
+  function exportFullSvg() {
+    var svgEl = wrapper.querySelector('.mermaid svg');
+    if (!svgEl) return;
+
+    var clone = svgEl.cloneNode(true);
+    clone.removeAttribute('id');
+
+    // Ensure xmlns is present for standalone SVG
+    if (!clone.getAttribute('xmlns')) {
+      clone.setAttribute('xmlns', 'http://www.w3.org/2000/svg');
+    }
+
+    // Inject inherited page styles so the SVG is self-contained.
+    // Mermaid foreignObject text inherits color/font from the HTML page;
+    // without these, text is invisible when the SVG is opened standalone.
+    var bodyStyles = getComputedStyle(document.body);
+    var textColor = bodyStyles.color;
+    var fontFamily = bodyStyles.fontFamily;
+    var bgColor = bodyStyles.backgroundColor;
+
+    var styleEl = document.createElementNS('http://www.w3.org/2000/svg', 'style');
+    styleEl.textContent =
+      'foreignObject { color: ' + textColor + '; font-family: ' + fontFamily + '; }';
+    clone.insertBefore(styleEl, clone.firstChild);
+
+    // Insert a background rect — CSS background doesn't work in standalone SVGs.
+    // A <rect> filling the viewBox is the universal way to set SVG background.
+    var vb = clone.getAttribute('viewBox');
+    if (vb) {
+      var parts = vb.split(/\s+/);
+      var bgRect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+      bgRect.setAttribute('x', parts[0]);
+      bgRect.setAttribute('y', parts[1]);
+      bgRect.setAttribute('width', parts[2]);
+      bgRect.setAttribute('height', parts[3]);
+      bgRect.setAttribute('fill', bgColor);
+      // Insert after <style> but before diagram content
+      styleEl.insertAdjacentElement('afterend', bgRect);
+    }
+
+    var svgString = new XMLSerializer().serializeToString(clone);
+
+    if (window.mermaidViewer && window.mermaidViewer.exportSvg) {
+      window.mermaidViewer.exportSvg(svgString);
+    }
+  }
+
   // === Text Blocks ===
   container.addEventListener('click', function(e) {
     if (currentMode !== 'text') return;
@@ -889,8 +939,11 @@ ${mermaidDivs}
       case 'v': case 'V': setMode('select'); break;
       case 'd': case 'D': setMode('draw'); break;
       case 't': case 'T': setMode('text'); break;
+      case 'e': case 'E': exportFullSvg(); break;
       case 'Delete': case 'Backspace': deleteSelected(); break;
-      case 'Escape': deselectAll(); break;
+      case 'Escape':
+        deselectAll();
+        break;
     }
   });
 
@@ -898,6 +951,7 @@ ${mermaidDivs}
   document.getElementById('btn-select').addEventListener('click', function() { setMode('select'); });
   document.getElementById('btn-draw').addEventListener('click', function() { setMode('draw'); });
   document.getElementById('btn-text').addEventListener('click', function() { setMode('text'); });
+  document.getElementById('btn-export').addEventListener('click', function() { exportFullSvg(); });
 
   // === Load Annotations from Main Process ===
   function loadAnnotationsFromData(data) {
@@ -960,6 +1014,10 @@ ${mermaidDivs}
 
     window.mermaidViewer.onClearAnnotations(function() {
       clearAll();
+    });
+
+    window.mermaidViewer.onExportSvg(function() {
+      exportFullSvg();
     });
 
     // Notify main process we're ready

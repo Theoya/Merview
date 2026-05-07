@@ -240,6 +240,8 @@ function buildMenu(): void {
         { type: 'separator' },
         { label: 'Delete Selected', accelerator: 'Delete', click: () => mainWindow?.webContents.send('delete-selected') },
         { label: 'Clear All Annotations', click: () => mainWindow?.webContents.send('clear-annotations') },
+        { type: 'separator' },
+        { label: 'Export SVG', accelerator: 'E', click: () => mainWindow?.webContents.send('export-svg-trigger') },
       ],
     },
   ];
@@ -311,11 +313,32 @@ ipcMain.handle('save-annotations', (_event, annotations: Annotation[]) => {
   }, 500);
 });
 
+ipcMain.handle('export-svg', async (_event, svgMarkup: string) => {
+  if (!mainWindow) return false;
+
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Export SVG',
+    defaultPath: currentFilePath
+      ? currentFilePath.replace(/\.[^.]+$/, '.svg')
+      : 'diagram.svg',
+    filters: [
+      { name: 'SVG Image', extensions: ['svg'] },
+    ],
+  });
+
+  if (!result.canceled && result.filePath) {
+    writeFileSync(result.filePath, svgMarkup, 'utf-8');
+    return true;
+  }
+  return false;
+});
+
 ipcMain.on('renderer-ready', () => {
   if (mainWindow) {
     mainWindow.webContents.send('load-annotations', currentAnnotations);
   }
 });
+
 
 ipcMain.handle('read-image-as-datauri', async (_event, filePath: string) => {
   const ext = filePath.toLowerCase().replace(/.*\./, '');

@@ -15,6 +15,10 @@ contextBridge.exposeInMainWorld('mermaidViewer', {
   saveAnnotations: (annotations: any[]) => ipcRenderer.invoke('save-annotations', annotations),
   readImageAsDataUri: (filePath: string) => ipcRenderer.invoke('read-image-as-datauri', filePath),
   notifyReady: () => ipcRenderer.send('renderer-ready'),
+  exportSvg: (svgMarkup: string) => ipcRenderer.invoke('export-svg', svgMarkup),
+  onExportSvg: (callback: () => void) => {
+    ipcRenderer.on('export-svg-trigger', () => callback());
+  },
 
   // Annotation event listeners
   onLoadAnnotations: (callback: (annotations: any[]) => void) => {
